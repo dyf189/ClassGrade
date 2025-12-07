@@ -15,7 +15,7 @@ class GradeSummaryGenerator:
     def __init__(self):
         # 科目定义
         self.grade7_subjects = ['语文', '数学', '英语', '地理', '生物', '历史', '政治']
-        self.grade8_subjects = ['语文', '数学', '英语', '地理', '生物', '历史', '政治', '物理']
+        self.grade8_subjects = ['语文', '数学', '英语', '地理', '生物', '历史', '政治', '物理', '化学']
         
         # 样式定义
         self.header_fill = PatternFill(start_color="FFD966", end_color="FFD966", fill_type="solid")
@@ -40,7 +40,7 @@ class GradeSummaryGenerator:
         
         # 定义8个学期的完整列表，确保能识别所有学期
         semester_keys = ['初一上期中', '初一上期末', '初一下期中', '初一下期末', 
-                         '初二上期中', '初二上期末', '初二下期中', '初二下期末']
+                         '初二上期中', '初二上期末', '初二下期中', '初二下期末', '初三上期中']
         
         for file in all_files:
             try:
@@ -67,6 +67,8 @@ class GradeSummaryGenerator:
                         grade = "初一"
                     elif "初二" in filename:
                         grade = "初二"
+                    elif "初三" in filename:
+                        grade = "初三"
                     
                     # 提取学期信息
                     if "上" in filename:
@@ -181,7 +183,7 @@ class GradeSummaryGenerator:
             
             # 包含期中期末的所有学期
             semesters = ['初一上期中', '初一上期末', '初一下期中', '初一下期末', 
-                         '初二上期中', '初二上期末', '初二下期中', '初二下期末']
+                         '初二上期中', '初二上期末', '初二下期中', '初二下期末', '初三上期中']
             
             # 核心改进：使用模板中的科目名称作为基准，建立精确的映射关系
             template_subjects = self._get_template_subjects(ws)
@@ -297,7 +299,7 @@ class GradeSummaryGenerator:
         start_col = 3   # 科目从第3列（C列）开始
         
         # 定义标准科目名称列表，用于验证
-        standard_subjects = {'语文', '数学', '英语', '地理', '生物', '历史', '政治', '物理'}
+        standard_subjects = {'语文', '数学', '英语', '地理', '生物', '历史', '政治', '物理', '化学', '总分'}
         
         # 从第3列（C列）开始向右查找科目名称，最多检查到第15列
         for col_idx in range(start_col, 16):
@@ -321,7 +323,7 @@ class GradeSummaryGenerator:
         if not template_subjects:
             print("未从模板中识别到科目，使用默认映射")
             # 默认映射：从第3列（C列）开始依次排列标准科目
-            default_subjects = ['语文', '数学', '英语', '物理', '政治', '历史', '生物', '地理']
+            default_subjects = ['语文', '数学', '英语', '物理', '政治', '历史', '生物', '地理', '化学', '总分']
             template_subjects = {subject: start_col + i for i, subject in enumerate(default_subjects)}
         
         return template_subjects
@@ -330,8 +332,7 @@ class GradeSummaryGenerator:
         """清理科目名称，移除前缀、后缀和特殊字符"""
         # 去除空格
         clean_name = subject_name.strip().replace(' ', '')
-        
-        # 定义要移除的常见后缀
+# 定义要移除的常见后缀
         suffixes = ['成绩', '分数', '得分', '分', '绩', '考试', '科目', '期中', '期末']
         for suffix in suffixes:
             if clean_name.endswith(suffix):
@@ -339,7 +340,7 @@ class GradeSummaryGenerator:
                 break
         
         # 定义要移除的常见前缀
-        prefixes = ['期中', '期末', '上学期', '下学期', '初一', '初二']
+        prefixes = ['期中', '期末', '上学期', '下学期', '初一', '初二', '初三']
         for prefix in prefixes:
             if clean_name.startswith(prefix):
                 clean_name = clean_name[len(prefix):]
@@ -359,6 +360,9 @@ class GradeSummaryGenerator:
                 f"{subject}成绩", f"{subject}分数", f"{subject}得分", f"{subject}分",
                 f"期中{subject}", f"期末{subject}", f"{subject}期中", f"{subject}期末"
             ]
+
+            if subject == "总分":
+                patterns.extend(["总分", "总分成绩", "总分分数", "总分得分", "总分分", "总分数", "总成绩"])
             
             # 查找匹配的列
             matched_column = self._find_matching_column(data_columns, patterns)
@@ -389,8 +393,8 @@ class GradeSummaryGenerator:
         """填充排名数据"""
         # 定义排名类型和对应的列索引
         rank_types = {
-            '校排名': 11,  # 校排名在第11列
-            '班排名': 12   # 班排名在第12列
+            '校排名': 14,  # 校排名在第11列
+            '班排名': 13   # 班排名在第12列
         }
         
         # 填充校排名
@@ -417,7 +421,7 @@ class GradeSummaryGenerator:
         
         # 填充班排名
         class_rank_found = False
-        class_rank_variants = ['班排名', '班名次', '班级排名']
+        class_rank_variants = ['班排名', '班名次', '班级排名', '班级名次']
         for variant in class_rank_variants:
             if variant in row_data.index:
                 try:
@@ -437,6 +441,30 @@ class GradeSummaryGenerator:
         if not class_rank_found:
             print("未找到班排名数据")
             
+            # 新增：填充总分数据（固定在第12列，L列）- 移到正确位置
+        total_score_found = False
+        total_score_variants = ['总分', '总分成绩', '总分分数', '总分得分', '总分分', '总分数', '总成绩']
+            
+        for variant in total_score_variants:
+            if variant in row_data.index:
+                try:
+                    if pd.notna(row_data[variant]):
+                        value = row_data[variant]
+                        try:
+                            value = float(value)
+                        except:
+                            pass
+                            # 总分固定在第12列（L列）
+                        self.safe_write_cell(ws, current_row, 12, value)
+                        print(f"填充总分: 从列 '{variant}' 获取值 '{value}' -> 单元格({current_row}, 12)")
+                        total_score_found = True
+                        break
+                except Exception as e:
+                    print(f"填充总分时出错: {str(e)}")
+            
+        if not total_score_found:
+            print("未找到总分数据")
+
     def apply_styles(self, ws, start_row, row_count):
         """应用样式到工作表，避免处理合并单元格"""
         # 创建一个合并单元格坐标的集合，用于快速检查
@@ -503,6 +531,271 @@ class GradeSummaryGenerator:
         
         print(f"成功生成 {success_count} 份学生成绩报告，保存在 {output_dir} 目录中")
 
+class GradeBefore200:
+    def __init__(self):
+        # 样式定义
+        self.header_fill = PatternFill(start_color="FFD966", end_color="FFD966", fill_type="solid")
+        self.header_font = Font(bold=True, color="000000")
+        self.border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        self.center_alignment = Alignment(horizontal='center', vertical='center')
+        
+        # 定义9个学期
+        self.semesters = ['初一上期中', '初一上期末', '初一下期中', '初一下期末', 
+                         '初二上期中', '初二上期末', '初二下期中', '初二下期末', '初三上期中']
+    
+    def create_template_file(self, template_path):
+        """创建前200名统计模板文件"""
+        try:
+            from openpyxl import Workbook
+            
+            wb = Workbook()
+            ws = wb.active
+            
+            # 设置表头
+            ws['A1'] = "学期统计"
+            ws['A2'] = "学期"
+            ws['A3'] = "人数"
+            ws['A4'] = "学生姓名"
+            
+            # 设置样式
+            ws['A1'].font = self.header_font
+            ws['A2'].font = self.header_font
+            ws['A3'].font = self.header_font
+            ws['A4'].font = self.header_font
+            
+            # 保存模板文件
+            wb.save(template_path)
+            print(f"已创建新的模板文件: {template_path}")
+            return True
+        except Exception as e:
+            print(f"创建模板文件时出错: {str(e)}")
+            return False
+    
+    def load_all_grades(self, data_dir):
+        """加载所有成绩文件（复用GradeSummaryGenerator的加载逻辑）"""
+        all_files = []
+        all_files.extend(glob.glob(os.path.join(data_dir, "*.xlsx")))
+        all_files.extend(glob.glob(os.path.join(data_dir, "*.xls")))
+        
+        all_data = {}
+        
+        for file in all_files:
+            try:
+                filename = os.path.basename(file)
+                grade = None
+                semester = None
+                exam_type = None
+                
+                # 匹配学期
+                matched = False
+                for key in self.semesters:
+                    if key in filename:
+                        grade = key[:2]
+                        semester = key[2:3]
+                        exam_type = key[3:]
+                        matched = True
+                        break
+                
+                if not matched:
+                    if "初一" in filename:
+                        grade = "初一"
+                    elif "初二" in filename:
+                        grade = "初二"
+                    elif "初三" in filename:
+                        grade = "初三"
+                    
+                    if "上" in filename:
+                        semester = "上"
+                    elif "下" in filename:
+                        semester = "下"
+                    
+                    if "期中" in filename:
+                        exam_type = "期中"
+                    elif "期末" in filename:
+                        exam_type = "期末"
+                
+                if not grade or not semester or not exam_type:
+                    print(f"无法从文件名 {filename} 中提取完整信息，跳过此文件")
+                    continue
+                
+                key = f"{grade}{semester}{exam_type}"
+                
+                try:
+                    df = pd.read_excel(file)
+                    all_data[key] = df
+                    print(f"成功加载: {key} - {filename}")
+                except Exception as e:
+                    print(f"加载文件 {file} 时出错: {str(e)}")
+            except Exception as e:
+                print(f"处理文件 {file} 时出错: {str(e)}")
+        
+        return all_data
+    
+    def find_school_rank_column(self, df):
+        """查找校排名列"""
+        rank_columns = ['校排名', '校名次', '序号', '校次', '名次']
+        for col in df.columns:
+            col_str = str(col).strip()
+            for rank_col in rank_columns:
+                if rank_col in col_str:
+                    return col
+        return None
+    
+    def find_student_name_column(self, df):
+        """查找学生姓名列"""
+        name_columns = ['姓名', '名字', '学生姓名', '学生名字']
+        for col in df.columns:
+            col_str = str(col).strip()
+            for name_col in name_columns:
+                if name_col in col_str:
+                    return col
+        return None
+    
+    def get_top_200_students(self, df):
+        """获取前200名学生（校排名<=200）"""
+        rank_col = self.find_school_rank_column(df)
+        name_col = self.find_student_name_column(df)
+        
+        if not rank_col or not name_col:
+            print(f"未找到排名列或姓名列，跳过此文件")
+            return []
+        
+        try:
+            # 过滤出校排名<=200的学生
+            df_filtered = df[pd.to_numeric(df[rank_col], errors='coerce') <= 200]
+            
+            # 按排名排序
+            df_sorted = df_filtered.sort_values(by=rank_col, ascending=True)
+            
+            # 提取学生姓名
+            top_students = df_sorted[name_col].dropna().astype(str).tolist()
+            
+            return top_students
+        except Exception as e:
+            print(f"获取前200名学生时出错: {str(e)}")
+            return []
+    
+    def safe_write_cell(self, ws, row, col, value):
+        """安全地写入单元格，处理合并单元格的情况"""
+        try:
+            target_cell = ws.cell(row=row, column=col)
+            # 检查是否是合并单元格
+            for merged_cell in ws.merged_cells.ranges:
+                if target_cell.coordinate in merged_cell:
+                    # 如果是合并单元格，写入左上角单元格
+                    ws[merged_cell.start_cell.coordinate] = value
+                    return True
+            # 不是合并单元格，直接写入
+            target_cell.value = value
+            return True
+        except Exception as e:
+            print(f"写入单元格({row}, {col})时出错: {str(e)}")
+            return False
+    
+    def apply_styles(self, ws):
+        """应用样式到工作表"""
+        # 设置标题行样式（第2行和第3行）
+        for row in [2, 3]:
+            for col in range(2, 12):  # B列到K列
+                cell = ws.cell(row=row, column=col)
+                cell.font = self.header_font
+                cell.border = self.border
+                cell.alignment = self.center_alignment
+                if row == 2:  # 第2行添加黄色填充
+                    cell.fill = self.header_fill
+        
+        # 设置学生姓名区域样式（从第4行开始）
+        max_row = ws.max_row
+        for row in range(4, max_row + 1):
+            for col in range(2, 12):  # B列到K列
+                cell = ws.cell(row=row, column=col)
+                cell.border = self.border
+                cell.alignment = self.center_alignment
+    
+    def generate_top200_report(self, data_dir, template_path, output_path):
+        """生成前200名统计报告"""
+        try:
+            # 检查模板文件是否存在且有效
+            if not os.path.exists(template_path):
+                print(f"模板文件 '{template_path}' 不存在，尝试创建新模板...")
+                if not self.create_template_file(template_path):
+                    print("创建模板文件失败，无法生成报告")
+                    return False
+            
+            # 尝试加载模板
+            try:
+                wb = load_workbook(template_path)
+                ws = wb.active
+                print(f"成功加载模板文件: {template_path}")
+            except Exception as e:
+                print(f"加载模板文件 '{template_path}' 时出错: {str(e)}")
+                print("尝试创建新的模板文件...")
+                if not self.create_template_file(template_path):
+                    print("创建模板文件失败，无法生成报告")
+                    return False
+                # 重新加载新创建的模板
+                wb = load_workbook(template_path)
+                ws = wb.active
+            
+            # 加载成绩数据
+            all_data = self.load_all_grades(data_dir)
+            
+            if not all_data:
+                print("未找到任何成绩文件!")
+                return False
+            
+            print(f"成功加载 {len(all_data)} 个学期的数据")
+            
+            # 填充学期名称（B2往右）
+            for i, semester in enumerate(self.semesters):
+                col = 2 + i  # B列开始，依次向右
+                self.safe_write_cell(ws, 2, col, semester)
+                print(f"填充学期名称: {semester} -> 单元格(2, {col})")
+            
+            # 统计每个学期的前200名学生并填充
+            for i, semester in enumerate(self.semesters):
+                col = 2 + i  # B列开始，依次向右
+                
+                if semester not in all_data:
+                    print(f"警告: 未找到 {semester} 的数据")
+                    # 填充人数为0
+                    self.safe_write_cell(ws, 3, col, 0)
+                    continue
+                
+                df = all_data[semester]
+                top_students = self.get_top_200_students(df)
+                
+                # 填充人数（B3往右）
+                self.safe_write_cell(ws, 3, col, len(top_students))
+                print(f"填充人数: {semester} -> {len(top_students)}人 -> 单元格(3, {col})")
+                
+                # 填充学生姓名（从B4开始往下）
+                for j, student_name in enumerate(top_students):
+                    row = 4 + j  # 从第4行开始
+                    self.safe_write_cell(ws, row, col, student_name)
+                    if j < 5:  # 只打印前5个学生的填充信息，避免输出过多
+                        print(f"填充学生姓名: {student_name} -> 单元格({row}, {col})")
+                
+                if len(top_students) > 5:
+                    print(f"... 共填充 {len(top_students)} 名学生")
+            
+            # 应用样式
+            self.apply_styles(ws)
+            
+            # 保存文件
+            wb.save(output_path)
+            print(f"前200名统计报告已生成: {output_path}")
+            return True
+            
+        except Exception as e:
+            print(f"生成前200名统计报告时出错: {str(e)}")
+            return False
+
 # 使用示例
 if __name__ == "__main__":
     # 提示安装xlrd库（如果需要）
@@ -524,3 +817,15 @@ if __name__ == "__main__":
     
     # 生成所有报告
     generator.generate_all_reports(data_directory, template_file, output_directory)
+    
+    # 新增：生成前200名统计报告
+    top200_generator = GradeBefore200()
+    top200_template = "前200名.xlsx"  # 前200名模板文件
+    top200_output = "全校前200名统计.xlsx"  # 前200名统计输出文件
+    
+    # 检查模板文件是否存在，如果不存在或损坏则创建新模板
+    if not os.path.exists(top200_template):
+        print(f"前200名模板文件 '{top200_template}' 不存在，将创建新模板")
+        top200_generator.create_template_file(top200_template)
+    
+    top200_generator.generate_top200_report(data_directory, top200_template, top200_output)
